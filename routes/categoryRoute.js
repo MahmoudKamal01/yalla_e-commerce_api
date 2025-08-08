@@ -1,18 +1,30 @@
 const express = require("express");
 
 const router = express.Router();
+const subCategoryRoute = require("./subCategoryRoute");
 const {
   getCategories,
   createCategory,
-  getCategoryById,
+  getCategory,
   updateCategory,
   deleteCategory,
 } = require("../services/categoryService");
+const {
+  getCategoryValidator,
+  createCategoryValidator,
+  updateCategoryValidator,
+  deleteCategoryValidator,
+} = require("../utils/validators/categoryValidator");
 
-router.route("/").get(getCategories).post(createCategory);
+router.use("/:categoryId/sub-categories", subCategoryRoute);
+
+router
+  .route("/")
+  .get(getCategories)
+  .post(createCategoryValidator, createCategory);
 router
   .route("/:id")
-  .get(getCategoryById)
-  .put(updateCategory)
-  .delete(deleteCategory);
+  .get(getCategoryValidator, getCategory)
+  .put(updateCategoryValidator, updateCategory)
+  .delete(deleteCategoryValidator, deleteCategory);
 module.exports = router;
