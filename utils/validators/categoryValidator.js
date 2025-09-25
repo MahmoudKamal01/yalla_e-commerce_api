@@ -12,10 +12,12 @@ exports.createCategoryValidator = [
 ];
 
 exports.updateCategoryValidator = [
+  check("id").isMongoId().withMessage("Invalid category ID format"),
   check("name")
-    .notEmpty()
+    .optional()
     .isLength({ min: 3 })
     .withMessage("Name must be at least 3 characters long"),
+  validatorMiddleware,
 ];
 exports.getCategoryValidator = [
   check("id").isMongoId().withMessage("Invalid category ID format"),

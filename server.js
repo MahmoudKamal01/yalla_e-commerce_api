@@ -1,11 +1,12 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const morgan = require("morgan");
-
+const path = require("path");
 const dbConnection = require("./config/database");
 const categoryRoute = require("./routes/categoryRoute");
 const subCategoryRoute = require("./routes/subCategoryRoute");
 const brandRoute = require("./routes/brandRoute");
+const productRoute = require("./routes/productRoute");
 const ApiError = require("./utils/apiError");
 const globalErrorHandler = require("./middlewares/errorMiddleware");
 
@@ -14,6 +15,8 @@ dotenv.config({ path: "./config.env" });
 const app = express();
 
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "uploads")));
+
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
   console.log("👩‍💻 Development mode is ON");
@@ -22,6 +25,7 @@ if (process.env.NODE_ENV === "development") {
 app.use("/api/v1/categories", categoryRoute);
 app.use("/api/v1/sub-categories", subCategoryRoute);
 app.use("/api/v1/brands", brandRoute);
+app.use("/api/v1/products", productRoute);
 
 app.get("/test", (_, res) => {
   res.send("Tests route is working!");

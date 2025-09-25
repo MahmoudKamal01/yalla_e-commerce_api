@@ -1,107 +1,64 @@
-const asyncHandler = require("express-async-handler");
-const CategoryModel = require("../models/categoryModel");
-const slugify = require("slugify");
-const ApiError = require("../utils/apiError");
-
-// @desc    Get all categories
+const factory = require("./handlersFactory");
+const Category = require("../models/categoryModel");
+const multer = require("multer");
+const { v4: uuidv4 } = require("uuid");
+const sharp = require("sharp");
+const path = require("path");
+const fs = require("fs");
+const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
+const {
+  deleteImageMiddleware,
+} = require("../middlewares/deleteImageMiddleware");
+// @desc    Get list of categories
 // @route   GET /api/v1/categories
 // @access  Public
-exports.getCategories = asyncHandler(async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
 
-  const categories = await CategoryModel.find().skip(skip).limit(limit);
-  res.status(200).json({
-    status: "success",
-    results: categories.length,
-    page,
-    limit,
-    data: {
-      categories,
-    },
-  });
-});
+// Upload single image
+exports.uploadCategoryImage = uploadSingleImage("image");
 
-// @desc get a single category by id
-// @route GET /api/v1/categories/:id
-// @access Public
-exports.getCategory = asyncHandler(async (req, res, next) => {
-  const { id } = req.params;
+// Image processing
+exports.resizeCategoryImage = async (req, res, next) => {
+  if (!req.file) return next();
 
-  const category = await CategoryModel.findById(id);
+  const filename = `category-${uuidv4()}-${Date.now()}.jpeg`;
 
-  if (!category) {
-    return next(new ApiError(`Category with id ${id} not found`, 404));
-  }
+  await sharp(req.file.buffer)
+    .resize(600, 600)
+    .toFormat("jpeg")
+    .jpeg({ quality: 90 })
+    .toFile(`uploads/categories/${filename}`);
 
-  res.status(200).json({
-    status: "success",
-    data: {
-      category,
-    },
-  });
-});
+  req.body.image = filename;
+  next();
+};
 
-// @desc    Create a new category
-// @route   POST /api/v1/categories
+// @desc    Get list of categories
+// @route   GET /api/v1/categories
+// @access  Public
+exports.getCategories = factory.getAll(Category);
+
+// @desc    Get specific category by id
+// @route   GET /api/v1/categories/:id
+// @access  Public
+exports.getCategory = factory.getOne(Category);
+
+// @desc    Create category
+// @route   POST  /api/v1/categories
 // @access  Private
-exports.createCategory = asyncHandler(async (req, res, next) => {
-  const name = req.body.name;
-  if (!name) {
-    return next(new ApiError("Category name is required", 400));
-  }
-  const newCategory = await CategoryModel.create({
-    name,
-    slug: slugify(name, { lower: true }),
-  });
+exports.createCategory = factory.createOne(Category);
 
-  res.status(201).json({
-    status: "success",
-    data: {
-      category: newCategory,
-    },
-  });
-});
-
-// @desc    Update a category
+// @desc    Update specific category
 // @route   PUT /api/v1/categories/:id
 // @access  Private
-exports.updateCategory = asyncHandler(async (req, res, next) => {
-  const { id } = req.params;
-  const { name } = req.body;
+exports.updateCategory = factory.updateOne(Category);
 
-  const category = await CategoryModel.findByIdAndUpdate(
-    id,
-    {
-      name,
-      slug: slugify(name, { lower: true }),
-    },
-    { new: true }
-  );
-
-  if (!category) {
-    return next(new ApiError(`Category with id ${id} not found`, 404));
-  }
-
-  res.status(201).json({
-    status: "success",
-    data: {
-      category,
-    },
-  });
-});
-
-// @desc    Delete a category
+// @desc    Delete specific category
 // @route   DELETE /api/v1/categories/:id
 // @access  Private
-exports.deleteCategory = asyncHandler(async (req, res, next) => {
-  const { id } = req.params;
+exports.deleteCategory = factory.deleteOne(Category);
 
-  const category = await CategoryModel.findByIdAndDelete(id);
-  if (!category) {
-    return next(new ApiError(`Category with id ${id} not found`, 404));
-  }
-
-  res.status(204).send();
+// @desc    Delete category image
+exports.deleteCategoryImage = deleteImageMiddleware({
+  model: Category,
+  folder: "categories",
 });
