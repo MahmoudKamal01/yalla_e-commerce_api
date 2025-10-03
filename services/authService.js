@@ -11,7 +11,7 @@ const createToken = require("../utils/createToken");
 const User = require("../models/userModel");
 
 // @desc    Signup
-// @route   GET /api/v1/auth/signup
+// @route   POST /api/v1/auth/signup
 // @access  Public
 exports.signup = asyncHandler(async (req, res, next) => {
   // 1- Create user
@@ -28,7 +28,7 @@ exports.signup = asyncHandler(async (req, res, next) => {
 });
 
 // @desc    Login
-// @route   GET /api/v1/auth/login
+// @route   POST /api/v1/auth/login
 // @access  Public
 exports.login = asyncHandler(async (req, res, next) => {
   // 1) check if password and email in the body (validation)
@@ -138,6 +138,8 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
   // Add expiration time for password reset code (10 min)
   user.passwordResetExpires = Date.now() + 10 * 60 * 1000;
   user.passwordResetVerified = false;
+  // Clear any previous verification timestamp
+  user.passwordResetVerifiedAt = undefined;
 
   await user.save();
 
@@ -153,7 +155,8 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     user.passwordResetCode = undefined;
     user.passwordResetExpires = undefined;
     user.passwordResetVerified = undefined;
-
+    user.passwordResetVerifiedAt = undefined;
+    console.log("error", err);
     await user.save();
     return next(new ApiError("There is an error in sending email", 500));
   }
@@ -178,11 +181,12 @@ exports.verifyPassResetCode = asyncHandler(async (req, res, next) => {
     passwordResetExpires: { $gt: Date.now() },
   });
   if (!user) {
-    return next(new ApiError("Reset code invalid or expired"));
+    return next(new ApiError("Reset code invalid or expired", 400));
   }
 
-  // 2) Reset code valid
+  // 2) Reset code valid - set verification status with timestamp
   user.passwordResetVerified = true;
+  user.passwordResetVerifiedAt = Date.now(); // Add verification timestamp
   await user.save();
 
   res.status(200).json({
@@ -202,19 +206,40 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // 2) Check if reset code verified
-  if (!user.passwordResetVerified) {
-    return next(new ApiError("Reset code not verified", 400));
+  // 2) Check if reset code verified AND still within time limit
+  const verificationExpiry = 30 * 60 * 1000; // 30 minutes after verification
+
+  if (
+    !user.passwordResetVerified ||
+    !user.passwordResetVerifiedAt ||
+    Date.now() - user.passwordResetVerifiedAt > verificationExpiry
+  ) {
+    // Clear expired verification data
+    user.passwordResetVerified = undefined;
+    user.passwordResetVerifiedAt = undefined;
+    user.passwordResetCode = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    return next(
+      new ApiError(
+        "Reset verification expired or not verified. Please request a new reset code.",
+        400
+      )
+    );
   }
 
+  // 3) Update password and clear all reset-related fields
   user.password = req.body.newPassword;
   user.passwordResetCode = undefined;
   user.passwordResetExpires = undefined;
   user.passwordResetVerified = undefined;
+  user.passwordResetVerifiedAt = undefined;
+  user.passwordChangedAt = Date.now(); // Update password changed timestamp
 
   await user.save();
 
-  // 3) if everything is ok, generate token
+  // 4) If everything is ok, generate token
   const token = createToken(user._id);
   res.status(200).json({ token });
 });
