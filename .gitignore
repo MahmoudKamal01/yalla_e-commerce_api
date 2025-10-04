@@ -9,6 +9,13 @@ yarn-error.log*
 .env.local
 .env.*.local
 config.env
+
+# Build scripts
+build-and-push.bat
+logs.bat
+logs.ps1
+status.bat
+status.ps1
 # Build output
 dist/
 build/

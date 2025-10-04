@@ -5,8 +5,16 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon server.js",
+    "start": "cross-env NODE_ENV=production node server.js",
     "start:prod": "cross-env NODE_ENV=production node server.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "docker:build": "docker build -t mahmoudkamalaldeen/yalla_ecommerce_api .",
+    "docker:run": "docker run -p 8000:8000 --env-file config.env mahmoudkamalaldeen/yalla_ecommerce_api",
+    "docker:compose:up": "docker-compose up -d",
+    "docker:compose:down": "docker-compose down",
+    "docker:compose:logs": "docker-compose logs -f app",
+    "docker:compose:build": "docker-compose build --no-cache",
+    "docker:compose:pull": "docker-compose pull"
   },
   "repository": {
     "type": "git",
@@ -33,6 +41,8 @@
     "nodemailer": "^7.0.6",
     "sharp": "^0.34.3",
     "slugify": "^1.6.6",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
