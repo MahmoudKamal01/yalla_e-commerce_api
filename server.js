@@ -7,10 +7,22 @@ const ApiError = require("./utils/apiError");
 const globalErrorHandler = require("./middlewares/errorMiddleware");
 const mountRoutes = require("./routes");
 const { swaggerUi, specs } = require("./config/swagger");
+const cors = require("cors");
 
 dotenv.config({ path: "./config.env" });
 
 const app = express();
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      return callback(null, true); // reflect the origin back
+    },
+    credentials: true, // ✅ allow cookies/authorization headers
+  })
+);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "uploads")));

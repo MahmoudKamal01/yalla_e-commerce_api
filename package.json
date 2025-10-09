@@ -27,6 +27,7 @@
   },
   "homepage": "https://github.com/MahmoudKamal01/yalla_e-commerce_api#readme",
   "dependencies": {
+    "cors": "^2.8.5",
     "bcryptjs": "^3.0.2",
     "colors": "^1.4.0",
     "crypto": "^1.0.1",
