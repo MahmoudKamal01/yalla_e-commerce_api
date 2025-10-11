@@ -25,7 +25,8 @@ app.use(
 );
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "uploads")));
+// Serve static files: /uploads/products/image.jpeg will be accessible at /products/image.jpeg
+app.use("/", express.static(path.join(__dirname, "uploads")));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
@@ -50,7 +51,7 @@ app.get("/test", (_, res) => {
   res.send("Tests route is working!");
 });
 
-app.all("/{*any}", (req, res, next) => {
+app.all("*", (req, res, next) => {
   next(new ApiError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
