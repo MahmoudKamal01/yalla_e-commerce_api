@@ -20,8 +20,25 @@ const categorySchema = new mongoose.Schema(
 
 const setImageUrl = (doc) => {
   if (doc.image) {
-    const imageUrl = `${process.env.BASE_URL}/categories/${doc.image}`;
-    doc.image = imageUrl;
+    // Check if image is already a full URL
+    if (doc.image.startsWith("http://") || doc.image.startsWith("https://")) {
+      // Extract filename from URL if it's a localhost URL
+      if (doc.image.includes("/categories/")) {
+        const filename = doc.image.split("/categories/").pop();
+        // Only process if it's not an external URL
+        if (!filename.startsWith("http")) {
+          doc.image = `${process.env.BASE_URL}/categories/${filename}`;
+        } else {
+          // External URL embedded, keep the external URL
+          doc.image = filename;
+        }
+      }
+      // else: keep external URL as is
+    } else {
+      // It's just a filename, construct full URL
+      const imageUrl = `${process.env.BASE_URL}/categories/${doc.image}`;
+      doc.image = imageUrl;
+    }
   }
 };
 

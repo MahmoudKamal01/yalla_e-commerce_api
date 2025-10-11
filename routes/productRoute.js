@@ -29,7 +29,24 @@ router.use("/:productId/reviews", reviewsRoute);
  * @swagger
  * /api/v1/products:
  *   get:
- *     summary: Get all products
+ *     summary: Get all products with filtering, sorting, pagination, and search
+ *     description: |
+ *       Retrieve products with advanced filtering options:
+ *       - Filter by category, brand, subcategory
+ *       - Price range filters (gte, lte, gt, lt)
+ *       - Rating filters
+ *       - Quantity and sold filters
+ *       - Search by keyword
+ *       - Sort by any field (prefix with - for descending)
+ *       - Paginate results
+ *       - Select specific fields to return
+ *
+ *       **Examples:**
+ *       - Get products in a category: `?category=67088f1ccae5a012e4e49a09`
+ *       - Price range $100-$500: `?price[gte]=100&price[lte]=500`
+ *       - Highly rated: `?ratingsAverage[gte]=4.5`
+ *       - Sort by price descending: `?sort=-price`
+ *       - Multiple filters: `?category=ID&brand=ID&price[gte]=100&ratingsAverage[gte]=4`
  *     tags: [Products]
  *     parameters:
  *       - in: query
@@ -37,57 +54,133 @@ router.use("/:productId/reviews", reviewsRoute);
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Page number
+ *           default: 1
+ *         description: Page number for pagination
+ *         example: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           minimum: 1
  *           maximum: 100
+ *           default: 50
  *         description: Number of products per page
+ *         example: 10
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sort by field (e.g., price, -price, ratingsAverage)
+ *         description: Sort by field(s). Use comma for multiple fields. Prefix with - for descending order
+ *         example: -price,ratingsAverage
  *       - in: query
  *         name: fields
  *         schema:
  *           type: string
- *         description: Select specific fields (e.g., title,price,imageCover)
+ *         description: Select specific fields to return (comma-separated)
+ *         example: title,price,imageCover,ratingsAverage
  *       - in: query
  *         name: keyword
  *         schema:
  *           type: string
- *         description: Search keyword
- *       - in: query
- *         name: price[gte]
- *         schema:
- *           type: number
- *         description: Minimum price
- *       - in: query
- *         name: price[lte]
- *         schema:
- *           type: number
- *         description: Maximum price
- *       - in: query
- *         name: ratingsAverage[gte]
- *         schema:
- *           type: number
- *         description: Minimum rating
+ *         description: Search keyword in title and description
+ *         example: laptop
  *       - in: query
  *         name: category
  *         schema:
  *           type: string
- *         description: Category ID
+ *         description: Filter by category ID
+ *         example: 67088f1ccae5a012e4e49a09
+ *       - in: query
+ *         name: subcategory
+ *         schema:
+ *           type: string
+ *         description: Filter by subcategory ID
+ *         example: 67088f1ccae5a012e4e49a10
  *       - in: query
  *         name: brand
  *         schema:
  *           type: string
- *         description: Brand ID
+ *         description: Filter by brand ID
+ *         example: 67088f1ccae5a012e4e49a11
+ *       - in: query
+ *         name: price[gte]
+ *         schema:
+ *           type: number
+ *         description: Minimum price (greater than or equal)
+ *         example: 100
+ *       - in: query
+ *         name: price[lte]
+ *         schema:
+ *           type: number
+ *         description: Maximum price (less than or equal)
+ *         example: 500
+ *       - in: query
+ *         name: price[gt]
+ *         schema:
+ *           type: number
+ *         description: Price greater than
+ *         example: 99
+ *       - in: query
+ *         name: price[lt]
+ *         schema:
+ *           type: number
+ *         description: Price less than
+ *         example: 501
+ *       - in: query
+ *         name: ratingsAverage[gte]
+ *         schema:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *         description: Minimum average rating (1-5)
+ *         example: 4.5
+ *       - in: query
+ *         name: ratingsAverage[lte]
+ *         schema:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *         description: Maximum average rating (1-5)
+ *         example: 5
+ *       - in: query
+ *         name: ratingsQuantity[gte]
+ *         schema:
+ *           type: number
+ *         description: Minimum number of ratings
+ *         example: 10
+ *       - in: query
+ *         name: quantity[gte]
+ *         schema:
+ *           type: number
+ *         description: Minimum quantity in stock
+ *         example: 1
+ *       - in: query
+ *         name: quantity[lte]
+ *         schema:
+ *           type: number
+ *         description: Maximum quantity in stock
+ *         example: 100
+ *       - in: query
+ *         name: sold[gte]
+ *         schema:
+ *           type: number
+ *         description: Minimum number sold
+ *         example: 50
+ *       - in: query
+ *         name: priceAfterDiscount[gte]
+ *         schema:
+ *           type: number
+ *         description: Minimum discounted price
+ *         example: 80
+ *       - in: query
+ *         name: priceAfterDiscount[lte]
+ *         schema:
+ *           type: number
+ *         description: Maximum discounted price
+ *         example: 400
  *     responses:
  *       200:
- *         description: List of products
+ *         description: List of products successfully retrieved
  *         content:
  *           application/json:
  *             schema:
@@ -95,7 +188,20 @@ router.use("/:productId/reviews", reviewsRoute);
  *               properties:
  *                 results:
  *                   type: integer
- *                   description: Number of products
+ *                   description: Number of products returned
+ *                   example: 10
+ *                 paginationResult:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     numberOfPages:
+ *                       type: integer
+ *                       example: 5
  *                 data:
  *                   type: array
  *                   items:

@@ -20,8 +20,29 @@ const brandSchema = new mongoose.Schema(
 
 const setImageUrl = (doc) => {
   if (doc.image) {
-    const imageUrl = `${process.env.BASE_URL}/categories/${doc.image}`;
-    doc.image = imageUrl;
+    // Check if image is already a full URL
+    if (doc.image.startsWith("http://") || doc.image.startsWith("https://")) {
+      // Extract filename from URL if it's a localhost/production URL
+      if (
+        doc.image.includes("/brands/") ||
+        doc.image.includes("/categories/")
+      ) {
+        const parts = doc.image.split(/\/(brands|categories)\//);
+        const filename = parts[parts.length - 1];
+        // Only process if it's not an external URL
+        if (!filename.startsWith("http")) {
+          doc.image = `${process.env.BASE_URL}/brands/${filename}`;
+        } else {
+          // External URL embedded, keep the external URL
+          doc.image = filename;
+        }
+      }
+      // else: keep external URL as is
+    } else {
+      // It's just a filename, construct full URL
+      const imageUrl = `${process.env.BASE_URL}/brands/${doc.image}`;
+      doc.image = imageUrl;
+    }
   }
 };
 
