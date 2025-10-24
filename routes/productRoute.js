@@ -14,15 +14,121 @@ const {
   deleteProduct,
   uploadProductImages,
   resizeProductImages,
+  getBestSellerProducts,
+  getSalesProducts,
 } = require("../services/productService");
 const authService = require("../services/authService");
 const reviewsRoute = require("./reviewRoute");
 
 const router = express.Router();
 
+// IMPORTANT: Specific routes must be defined BEFORE parameterized routes
+// to prevent them from being matched as :id parameters
+
+/**
+ * @swagger
+ * /api/v1/products/best-seller:
+ *   get:
+ *     summary: Get best seller products
+ *     description: Retrieve products ordered by the number sold (highest to lowest)
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of products per page
+ *     responses:
+ *       200:
+ *         description: List of best seller products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: integer
+ *                   description: Number of products returned
+ *                 paginationResult:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     numberOfPages:
+ *                       type: integer
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Product'
+ */
+router.get("/best-seller", getBestSellerProducts);
+
+/**
+ * @swagger
+ * /api/v1/products/sales:
+ *   get:
+ *     summary: Get products on sale
+ *     description: Retrieve products with discounts, ordered by discount amount (highest to lowest)
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of products per page
+ *     responses:
+ *       200:
+ *         description: List of products on sale with discount information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: integer
+ *                   description: Number of products returned
+ *                 paginationResult:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     numberOfPages:
+ *                       type: integer
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Product'
+ */
+router.get("/sales", getSalesProducts);
+
 // POST   /products/jkshjhsdjh2332n/reviews
 // GET    /products/jkshjhsdjh2332n/reviews
 // GET    /products/jkshjhsdjh2332n/reviews/87487sfww3
+// NOTE: This nested route must be AFTER specific routes but BEFORE the generic /:id route
 router.use("/:productId/reviews", reviewsRoute);
 
 /**
