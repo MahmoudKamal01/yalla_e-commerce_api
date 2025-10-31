@@ -6,33 +6,143 @@ class ApiFeatures {
 
   filter() {
     const queryStringObj = { ...this.queryString };
-    const excludesFields = ["page", "sort", "limit", "fields", "keyword"]; // Added "keyword"
+    const excludesFields = [
+      "page",
+      "sort",
+      "limit",
+      "fields",
+      "keyword",
+      "minPrice",
+      "maxPrice",
+    ];
     excludesFields.forEach((field) => delete queryStringObj[field]);
 
-    // Convert flattened query to nested object for patterns like sold[gt], price[lte]
-    const convertedQuery = {};
+    const mongoQuery = {};
+    const mongoose = require("mongoose");
 
+    // Process each query parameter
     Object.keys(queryStringObj).forEach((key) => {
+      // Skip special params handled separately
+      if (key === "category" || key === "brand" || key === "color") {
+        return;
+      }
+
+      // Handle operator syntax like price[gte], sold[lt]
       const match = key.match(/^(.+)\[(.+)\]$/);
       if (match) {
         const [, field, operator] = match;
-        if (!convertedQuery[field]) {
-          convertedQuery[field] = {};
+        if (!mongoQuery[field]) {
+          mongoQuery[field] = {};
         }
-        convertedQuery[field][operator] = queryStringObj[key];
+        // Add MongoDB operator with $ prefix
+        mongoQuery[field][`$${operator}`] = queryStringObj[key];
       } else {
-        convertedQuery[key] = queryStringObj[key];
+        mongoQuery[key] = queryStringObj[key];
       }
     });
 
-    // Apply filtration using [gte, gt, lte, lt, eq, ne]
-    let queryStr = JSON.stringify(convertedQuery);
-    queryStr = queryStr.replace(
-      /\b(gte|gt|lte|lt|eq|ne)\b/g,
-      (match) => `$${match}`
-    );
+    // Handle multiple categories
+    if (queryStringObj.category) {
+      let categoryIds = [];
 
-    this.mongooseQuery = this.mongooseQuery.find(JSON.parse(queryStr));
+      if (Array.isArray(queryStringObj.category)) {
+        // If it's already an array (multiple category params like ?category=id1&category=id2)
+        categoryIds = queryStringObj.category
+          .map((v) => (typeof v === "string" ? v.trim() : v))
+          .filter((v) => !!v && String(v).length > 0);
+      } else if (typeof queryStringObj.category === "string") {
+        // Single category
+        const value = queryStringObj.category.trim();
+        if (value.length > 0) {
+          categoryIds = [value];
+        }
+      }
+
+      // Convert to ObjectId and apply category filter
+      if (categoryIds.length > 1) {
+        const objectIds = categoryIds.map((id) => {
+          return mongoose.Types.ObjectId.isValid(id)
+            ? new mongoose.Types.ObjectId(id)
+            : id;
+        });
+        mongoQuery.category = { $in: objectIds };
+      } else if (categoryIds.length === 1) {
+        const id = categoryIds[0];
+        mongoQuery.category = mongoose.Types.ObjectId.isValid(id)
+          ? new mongoose.Types.ObjectId(id)
+          : id;
+      }
+    }
+
+    // Handle price range
+    const minPrice = this.queryString.minPrice;
+    const maxPrice = this.queryString.maxPrice;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      if (!mongoQuery.price) mongoQuery.price = {};
+
+      if (minPrice !== undefined && minPrice !== "") {
+        const parsedMin = Number(minPrice);
+        if (!isNaN(parsedMin)) {
+          mongoQuery.price.$gte = parsedMin;
+        }
+      }
+
+      if (maxPrice !== undefined && maxPrice !== "") {
+        const parsedMax = Number(maxPrice);
+        if (!isNaN(parsedMax)) {
+          mongoQuery.price.$lte = parsedMax;
+        }
+      }
+    }
+
+    // Handle multiple brands (IDs), supports comma-separated or repeated params
+    if (this.queryString.brand) {
+      let brandValues = [];
+      if (Array.isArray(this.queryString.brand)) {
+        brandValues = this.queryString.brand;
+      } else if (typeof this.queryString.brand === "string") {
+        const trimmed = this.queryString.brand.trim();
+        if (trimmed.includes(",")) {
+          brandValues = trimmed.split(",").map((v) => v.trim());
+        } else if (trimmed.length > 0) {
+          brandValues = [trimmed];
+        }
+      }
+      if (brandValues.length > 0) {
+        const normalized = brandValues.map((v) =>
+          mongoose.Types.ObjectId.isValid(v)
+            ? new mongoose.Types.ObjectId(v)
+            : v
+        );
+        mongoQuery.brand =
+          normalized.length > 1 ? { $in: normalized } : normalized[0];
+      }
+    }
+
+    // Handle color filter; supports single or comma-separated values, matches array field
+    if (this.queryString.color) {
+      let colorValues = [];
+      if (Array.isArray(this.queryString.color)) {
+        colorValues = this.queryString.color;
+      } else if (typeof this.queryString.color === "string") {
+        const trimmed = this.queryString.color.trim();
+        if (trimmed.includes(",")) {
+          colorValues = trimmed
+            .split(",")
+            .map((v) => v.trim())
+            .filter((v) => v.length > 0);
+        } else if (trimmed.length > 0) {
+          colorValues = [trimmed];
+        }
+      }
+      if (colorValues.length > 0) {
+        mongoQuery.colors =
+          colorValues.length > 1 ? { $in: colorValues } : colorValues[0];
+      }
+    }
+
+    this.mongooseQuery = this.mongooseQuery.find(mongoQuery);
     return this;
   }
 
@@ -41,7 +151,7 @@ class ApiFeatures {
       const sortBy = this.queryString.sort.split(",").join(" ");
       this.mongooseQuery = this.mongooseQuery.sort(sortBy);
     } else {
-      this.mongooseQuery = this.mongooseQuery.sort("-createdAt"); // Fixed typo
+      this.mongooseQuery = this.mongooseQuery.sort("-createdAt");
     }
     return this;
   }

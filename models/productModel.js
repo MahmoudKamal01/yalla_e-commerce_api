@@ -19,6 +19,17 @@ const productSchema = new mongoose.Schema(
       required: [true, "Product description is required"],
       minlength: [20, "Too short product description"],
     },
+    details: {
+      type: String,
+    },
+    dimensions: {
+      diameter: { type: String },
+      height: { type: String },
+      weight: { type: String },
+      material: { type: String },
+      dishwasherSafe: { type: Boolean },
+      microwaveSafe: { type: Boolean },
+    },
     quantity: {
       type: Number,
       required: [true, "Product quantity is required"],
@@ -88,6 +99,9 @@ productSchema.pre(/^find/, function (next) {
   this.populate({
     path: "category",
     select: "name -_id",
+  }).populate({
+    path: "brand",
+    select: "name _id",
   });
   next();
 });

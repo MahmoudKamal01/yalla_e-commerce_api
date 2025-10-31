@@ -1,6 +1,6 @@
-const asyncHandler = require('express-async-handler');
-const ApiError = require('../utils/apiError');
-const ApiFeatures = require('../utils/apiFeatures');
+const asyncHandler = require("express-async-handler");
+const ApiError = require("../utils/apiError");
+const ApiFeatures = require("../utils/apiFeatures");
 
 exports.deleteOne = (Model) =>
   asyncHandler(async (req, res, next) => {
@@ -53,26 +53,35 @@ exports.getOne = (Model, populationOpt) =>
     res.status(200).json({ data: document });
   });
 
-exports.getAll = (Model, modelName = '') =>
+exports.getAll = (Model, modelName = "") =>
   asyncHandler(async (req, res) => {
     let filter = {};
     if (req.filterObj) {
       filter = req.filterObj;
     }
-    // Build query
-    const documentsCounts = await Model.countDocuments();
-    const apiFeatures = new ApiFeatures(Model.find(filter), req.query)
-      .paginate(documentsCounts)
-      .filter()
-      .search(modelName)
-      .limitFields()
-      .sort();
 
-    // Execute query
-    const { mongooseQuery, paginationResult } = apiFeatures;
+    // Apply filter and search first
+    const baseFeatures = new ApiFeatures(Model.find(filter), req.query)
+      .filter()
+      .search(modelName);
+
+    // Count documents after filters for correct pagination
+    const filteredCount = await baseFeatures.mongooseQuery
+      .clone()
+      .countDocuments();
+
+    // Then apply sort, field limiting, and pagination
+    const finalFeatures = baseFeatures
+      .sort()
+      .limitFields()
+      .paginate(filteredCount);
+
+    const { mongooseQuery, paginationResult } = finalFeatures;
     const documents = await mongooseQuery;
 
-    res
-      .status(200)
-      .json({ results: documents.length, paginationResult, data: documents });
+    res.status(200).json({
+      results: documents.length,
+      paginationResult,
+      data: documents,
+    });
   });

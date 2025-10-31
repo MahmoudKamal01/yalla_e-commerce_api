@@ -16,6 +16,7 @@ const {
   resizeProductImages,
   getBestSellerProducts,
   getSalesProducts,
+  migrateDummyProductsAndBrands,
 } = require("../services/productService");
 const authService = require("../services/authService");
 const reviewsRoute = require("./reviewRoute");
@@ -125,6 +126,38 @@ router.get("/best-seller", getBestSellerProducts);
  */
 router.get("/sales", getSalesProducts);
 
+/**
+ * @swagger
+ * /api/v1/products/migrate/dummy:
+ *   post:
+ *     summary: Add dummy brands and random details/dimensions/brand to all products
+ *     description: Upserts a set of dummy brands and assigns random details, dimensions, and a random brand to each product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Migration completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 brandsCreatedOrUpdated:
+ *                   type: integer
+ *                 productsUpdated:
+ *                   type: integer
+ */
+router.post(
+  "/migrate/dummy",
+  authService.protect,
+  authService.allowedTo("admin", "manager"),
+  migrateDummyProductsAndBrands
+);
+
 // POST   /products/jkshjhsdjh2332n/reviews
 // GET    /products/jkshjhsdjh2332n/reviews
 // GET    /products/jkshjhsdjh2332n/reviews/87487sfww3
@@ -194,8 +227,8 @@ router.use("/:productId/reviews", reviewsRoute);
  *         name: category
  *         schema:
  *           type: string
- *         description: Filter by category ID
- *         example: 67088f1ccae5a012e4e49a09
+ *         description: Filter by category ID(s). Comma-separated for multiple IDs
+ *         example: 67088f1ccae5a012e4e49a09,67088f1ccae5a012e4e49a11
  *       - in: query
  *         name: subcategory
  *         schema:
@@ -206,8 +239,26 @@ router.use("/:productId/reviews", reviewsRoute);
  *         name: brand
  *         schema:
  *           type: string
- *         description: Filter by brand ID
- *         example: 67088f1ccae5a012e4e49a11
+ *         description: Filter by brand ID(s). Comma-separated for multiple IDs or repeat the param
+ *         example: 67088f1ccae5a012e4e49a11,67088f1ccae5a012e4e49a12
+ *       - in: query
+ *         name: color
+ *         schema:
+ *           type: string
+ *         description: Filter by color. Supports single or comma-separated values
+ *         example: red,blue
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *         description: Minimum price filter (alias for price[gte])
+ *         example: 100
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *         description: Maximum price filter (alias for price[lte])
+ *         example: 500
  *       - in: query
  *         name: price[gte]
  *         schema:

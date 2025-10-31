@@ -7,6 +7,8 @@ const {
 } = require("../middlewares/uploadImageMiddleware");
 const factory = require("./handlersFactory");
 const Product = require("../models/productModel");
+const Brand = require("../models/brandModel");
+const slugify = require("slugify");
 
 exports.uploadProductImages = uploadMultipleImages([
   {
@@ -20,9 +22,8 @@ exports.uploadProductImages = uploadMultipleImages([
 ]);
 
 exports.resizeProductImages = asyncHandler(async (req, res, next) => {
-  // console.log(req.files);
   //1- Image processing for imageCover
-  if (req.files.imageCover) {
+  if (req.files && req.files.imageCover) {
     const imageCoverFileName = `product-${uuidv4()}-${Date.now()}-cover.jpeg`;
 
     await sharp(req.files.imageCover[0].buffer)
@@ -35,7 +36,7 @@ exports.resizeProductImages = asyncHandler(async (req, res, next) => {
     req.body.imageCover = imageCoverFileName;
   }
   //2- Image processing for images
-  if (req.files.images) {
+  if (req.files && req.files.images) {
     req.body.images = [];
     await Promise.all(
       req.files.images.map(async (img, index) => {
@@ -51,9 +52,9 @@ exports.resizeProductImages = asyncHandler(async (req, res, next) => {
         req.body.images.push(imageName);
       })
     );
-
-    next();
   }
+  // Always continue to next middleware even when no files provided
+  next();
 });
 
 // @desc    Get list of products
@@ -154,5 +155,96 @@ exports.getSalesProducts = asyncHandler(async (req, res) => {
       numberOfPages,
     },
     data: products,
+  });
+});
+
+// @desc    Migration: add dummy brands and random details/dimensions/brand to products
+// @route   POST /api/v1/products/migrate/dummy
+// @access  Private (Admin/Manager)
+exports.migrateDummyProductsAndBrands = asyncHandler(async (req, res) => {
+  // 1) Upsert a set of dummy brands
+  const dummyBrandNames = [
+    "Acme",
+    "Globex",
+    "Initech",
+    "Umbrella",
+    "Soylent",
+    "Stark",
+    "Wayne",
+    "Wonka",
+  ];
+
+  const brandDocs = [];
+  for (const name of dummyBrandNames) {
+    const doc = await Brand.findOneAndUpdate(
+      { name },
+      { name, slug: slugify(name) },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    brandDocs.push(doc);
+  }
+
+  // 2) Prepare random generators
+  const detailsPool = [
+    "Classic porcelain dinner plate with smooth glaze.",
+    "Premium stainless steel water bottle with double-wall insulation.",
+    "Soft cotton crew-neck t-shirt with breathable fabric.",
+    "Ergonomic wireless mouse with adjustable DPI.",
+    "Durable bamboo cutting board with juice groove.",
+  ];
+
+  const dimensionSets = [
+    {
+      diameter: "26 cm",
+      height: "2 cm",
+      weight: "650 g",
+      material: "Porcelain",
+    },
+    {
+      diameter: "22 cm",
+      height: "1.8 cm",
+      weight: "520 g",
+      material: "Stoneware",
+    },
+    {
+      diameter: "18 cm",
+      height: "1.5 cm",
+      weight: "400 g",
+      material: "Ceramic",
+    },
+    {
+      diameter: "30 cm",
+      height: "2.2 cm",
+      weight: "780 g",
+      material: "Porcelain",
+    },
+  ];
+
+  const bool = () => Math.random() < 0.5;
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  // 3) Update all products with random details/dimensions and random brand
+  const products = await Product.find({});
+  for (const p of products) {
+    p.details = pick(detailsPool);
+    const dims = pick(dimensionSets);
+    p.dimensions = {
+      diameter: dims.diameter,
+      height: dims.height,
+      weight: dims.weight,
+      material: dims.material,
+      dishwasherSafe: bool(),
+      microwaveSafe: bool(),
+    };
+    if (brandDocs.length > 0) {
+      p.brand = pick(brandDocs)._id;
+    }
+    await p.save();
+  }
+
+  res.status(200).json({
+    status: "success",
+    brandsCreatedOrUpdated: brandDocs.length,
+    productsUpdated: products.length,
   });
 });
