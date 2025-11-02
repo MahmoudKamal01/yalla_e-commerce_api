@@ -9,6 +9,7 @@ const factory = require("./handlersFactory");
 const Product = require("../models/productModel");
 const Brand = require("../models/brandModel");
 const slugify = require("slugify");
+const ApiFeatures = require("../utils/apiFeatures");
 
 exports.uploadProductImages = uploadMultipleImages([
   {
@@ -85,24 +86,46 @@ exports.deleteProduct = factory.deleteOne(Product);
 // @route   GET /api/v1/products/best-seller
 // @access  Public
 exports.getBestSellerProducts = asyncHandler(async (req, res) => {
-  const limit = req.query.limit * 1 || 10;
+  // Apply filters and search using ApiFeatures
+  const baseFeatures = new ApiFeatures(Product.find(), req.query)
+    .filter()
+    .search("Products");
+
+  // Count filtered documents for pagination
+  const filteredCount = await baseFeatures.mongooseQuery
+    .clone()
+    .countDocuments();
+
+  // Apply sorting by sold (descending) - this is the main feature of this endpoint
   const page = req.query.page * 1 || 1;
+  const limit = req.query.limit * 1 || 10;
   const skip = (page - 1) * limit;
+  const endIndex = page * limit;
 
-  // Get products ordered by sold field (descending)
-  const products = await Product.find().sort("-sold").limit(limit).skip(skip);
+  // Get filtered and sorted products
+  const products = await baseFeatures.mongooseQuery
+    .sort("-sold")
+    .skip(skip)
+    .limit(limit);
 
-  // Get total count for pagination
-  const totalProducts = await Product.countDocuments();
-  const numberOfPages = Math.ceil(totalProducts / limit);
+  // Build pagination result
+  const numberOfPages = Math.ceil(filteredCount / limit);
+  const paginationResult = {
+    currentPage: page,
+    limit,
+    numberOfPages,
+  };
+
+  if (endIndex < filteredCount) {
+    paginationResult.next = page + 1;
+  }
+  if (skip > 0) {
+    paginationResult.prev = page - 1;
+  }
 
   res.status(200).json({
     results: products.length,
-    paginationResult: {
-      currentPage: page,
-      limit,
-      numberOfPages,
-    },
+    paginationResult,
     data: products,
   });
 });
@@ -111,18 +134,30 @@ exports.getBestSellerProducts = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/products/sales
 // @access  Public
 exports.getSalesProducts = asyncHandler(async (req, res) => {
-  const limit = req.query.limit * 1 || 10;
+  // Apply filters using ApiFeatures first
+  const baseFeatures = new ApiFeatures(Product.find(), req.query)
+    .filter()
+    .search("Products");
+
+  // Get the base query conditions
+  const baseQuery = baseFeatures.mongooseQuery.getQuery();
+
+  // Pagination params
   const page = req.query.page * 1 || 1;
+  const limit = req.query.limit * 1 || 10;
   const skip = (page - 1) * limit;
 
-  // Get products that have priceAfterDiscount and calculate discount amount
-  // Sort by discount amount (price - priceAfterDiscount) in descending order
+  // Combine base filters with sales condition using aggregation
+  const matchStage = {
+    ...baseQuery,
+    priceAfterDiscount: { $exists: true, $ne: null },
+    $expr: { $lt: ["$priceAfterDiscount", "$price"] },
+  };
+
+  // Use aggregation to calculate discount and sort
   const products = await Product.aggregate([
     {
-      $match: {
-        priceAfterDiscount: { $exists: true, $ne: null },
-        $expr: { $lt: ["$priceAfterDiscount", "$price"] },
-      },
+      $match: matchStage,
     },
     {
       $addFields: {
@@ -140,11 +175,8 @@ exports.getSalesProducts = asyncHandler(async (req, res) => {
     },
   ]);
 
-  // Get total count of products on sale
-  const totalSalesProducts = await Product.countDocuments({
-    priceAfterDiscount: { $exists: true, $ne: null },
-    $expr: { $lt: ["$priceAfterDiscount", "$price"] },
-  });
+  // Get total count of filtered products on sale
+  const totalSalesProducts = await Product.countDocuments(matchStage);
   const numberOfPages = Math.ceil(totalSalesProducts / limit);
 
   res.status(200).json({
