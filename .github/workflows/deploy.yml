@@ -27,8 +27,14 @@ jobs:
             echo "Pulling latest code..."
             git pull origin main
 
-            echo "Stopping containers..."
-            docker compose down
+            echo "Setting up required directories..."
+            mkdir -p certs vhost.d html
+
+            echo "Creating Docker network..."
+            docker network create nginx-network || true
+
+            echo "Stopping containers and cleaning up..."
+            docker compose down --remove-orphans
 
             echo "Starting containers..."
             docker compose up -d --build
