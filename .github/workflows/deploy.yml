@@ -34,11 +34,11 @@ jobs:
             docker compose up -d --build
 
             echo "Waiting for services to start..."
-            sleep 10
+            sleep 30
 
       - name: Health Check
         run: |
-          max_attempts=10
+          max_attempts=15
           attempt=0
 
           while [ $attempt -lt $max_attempts ]; do
@@ -52,7 +52,7 @@ jobs:
             else
               echo "⚠️  Health check failed. Status code: $response"
               attempt=$((attempt + 1))
-              sleep 5
+              sleep 10
             fi
           done
 
