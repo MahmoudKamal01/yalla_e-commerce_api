@@ -72,6 +72,9 @@ tests
 *.test.js
 *.spec.js
 
+
+*.pem
+
 # Build artifacts
 dist
 build

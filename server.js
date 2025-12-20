@@ -1,15 +1,15 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const morgan = require('morgan');
-const path = require('path');
-const dbConnection = require('./config/database');
-const ApiError = require('./utils/apiError');
-const globalErrorHandler = require('./middlewares/errorMiddleware');
-const mountRoutes = require('./routes');
-const { swaggerUi, specs } = require('./config/swagger');
-const cors = require('cors');
+const express = require("express");
+const dotenv = require("dotenv");
+const morgan = require("morgan");
+const path = require("path");
+const dbConnection = require("./config/database");
+const ApiError = require("./utils/apiError");
+const globalErrorHandler = require("./middlewares/errorMiddleware");
+const mountRoutes = require("./routes");
+const { swaggerUi, specs } = require("./config/swagger");
+const cors = require("cors");
 
-dotenv.config({ path: './config.env' });
+require("dotenv").config();
 
 const app = express();
 
@@ -26,32 +26,32 @@ app.use(
 
 app.use(express.json());
 // Serve static files: /uploads/products/image.jpeg will be accessible at /products/image.jpeg
-app.use('/', express.static(path.join(__dirname, 'uploads')));
+app.use("/", express.static(path.join(__dirname, "uploads")));
 
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-  console.log('👩‍💻 Development mode is ON');
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+  console.log("👩‍💻 Development mode is ON");
 }
 
 // Swagger Documentation
 app.use(
-  '/docs',
+  "/docs",
   swaggerUi.serve,
   swaggerUi.setup(specs, {
     explorer: true,
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Yalla E-commerce API Documentation',
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "Yalla E-commerce API Documentation",
   })
 );
 
 // Mount Routes
 mountRoutes(app);
 
-app.get('/test', (_, res) => {
-  res.send('Tests route is working!');
+app.get("/test", (_, res) => {
+  res.send("Tests route is working!");
 });
 
-app.all('/*splat', (req, res, next) => {
+app.all("/*splat", (req, res, next) => {
   next(new ApiError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
@@ -73,10 +73,10 @@ const startServer = async () => {
 startServer();
 
 //handling rejection errors outside express
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err.name, err.message);
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err.name, err.message);
   server.close(() => {
-    console.error('Shutting down the server due to unhandled rejection');
+    console.error("Shutting down the server due to unhandled rejection");
     process.exit(1); // Exit process with failure
   });
 });

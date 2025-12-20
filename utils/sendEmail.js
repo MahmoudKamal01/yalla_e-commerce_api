@@ -1,31 +1,40 @@
 const nodemailer = require("nodemailer");
 
-// Nodemailer
 const sendEmail = async (options) => {
-  // 1) Create transporter ( service that will send email like "gmail","Mailgun", "mialtrap", sendGrid)
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT, // if secure false port = 587, if true port= 465
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-    tls: {
-      rejectUnauthorized: false, // <--- ignores self-signed cert
-    },
-  });
+  try {
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
 
-  // 2) Define email options (like from, to, subject, email content)
-  const mailOpts = {
-    from: "bimmerfixes.com@gmail.com",
-    to: options.email,
-    subject: options.subject,
-    text: options.message,
-  };
+    // Optional: Verify connection
+    // await transporter.verify();
+    // console.log("✅ SMTP connection verified");
 
-  // 3) Send email
-  await transporter.sendMail(mailOpts);
+    const mailOpts = {
+      from: `"Yalla E-Commerce" <${process.env.EMAIL_USER}>`,
+      to: options.email,
+      subject: options.subject,
+      text: options.message,
+      html: options.html || options.message,
+    };
+
+    const info = await transporter.sendMail(mailOpts);
+    console.log("✅ Email sent:", info.messageId);
+
+    return info;
+  } catch (error) {
+    console.error("❌ Email error:", error.message);
+    throw error;
+  }
 };
 
 module.exports = sendEmail;

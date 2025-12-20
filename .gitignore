@@ -40,3 +40,6 @@ logs/
 *.swp
 *.bak
 *.tmp
+
+
+*.pem

@@ -1,0 +1,9 @@
+mkdir -p certs vhost.d html
+
+
+docker network create nginx-network || true
+
+
+and backend should be running at 5000 
+
+and then docker compose up 

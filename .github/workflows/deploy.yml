@@ -1,0 +1,78 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main # Change to your default branch name
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to AWS EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/ubuntu/yalla
+
+            echo "Pulling latest code..."
+            git pull origin main
+
+            echo "Stopping containers..."
+            docker compose down
+
+            echo "Starting containers..."
+            docker compose up -d --build
+
+            echo "Waiting for services to start..."
+            sleep 10
+
+      - name: Health Check
+        run: |
+          max_attempts=10
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            echo "Health check attempt $((attempt + 1))/$max_attempts"
+            
+            response=$(curl -s -o /dev/null -w "%{http_code}" https://alaayoussef.shop/test)
+            
+            if [ $response -eq 200 ]; then
+              echo "✅ Health check passed! Status code: $response"
+              exit 0
+            else
+              echo "⚠️  Health check failed. Status code: $response"
+              attempt=$((attempt + 1))
+              sleep 5
+            fi
+          done
+
+          echo "❌ Health check failed after $max_attempts attempts"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/ubuntu/yalla
+
+            echo "Deployment failed, rolling back..."
+            git reset --hard HEAD~1
+            docker compose down
+            docker compose up -d --build
+
+            echo "Rollback complete"
