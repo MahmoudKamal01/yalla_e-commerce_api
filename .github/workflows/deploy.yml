@@ -24,6 +24,10 @@ jobs:
           script: |
             cd /home/ubuntu/yalla
 
+            echo "Cleaning up any conflicts..."
+            git clean -fd
+            git reset --hard HEAD
+
             echo "Pulling latest code..."
             git pull origin main
 
@@ -31,10 +35,11 @@ jobs:
             mkdir -p certs vhost.d html
 
             echo "Creating Docker network..."
-            docker network create nginx-network || true
+            docker network create nginx-network 2>/dev/null || true
 
-            echo "Stopping containers and cleaning up..."
+            echo "Stopping and removing all containers..."
             docker compose down --remove-orphans
+            docker container prune -f
 
             echo "Starting containers..."
             docker compose up -d --build
