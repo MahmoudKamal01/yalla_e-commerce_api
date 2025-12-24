@@ -133,13 +133,11 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     .update(resetCode)
     .digest("hex");
 
-  // Save hashed password reset code into db
+  // In forgotPassword - ensure clear expiry time
   user.passwordResetCode = hashedResetCode;
-  // Add expiration time for password reset code (10 min)
-  user.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+  user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
   user.passwordResetVerified = false;
-  // Clear any previous verification timestamp
-  user.passwordResetVerifiedAt = undefined;
+  user.passwordResetVerifiedAt = undefined; // Explicitly set to undefined
 
   await user.save();
 
@@ -170,7 +168,6 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/auth/verifyResetCode
 // @access  Public
 exports.verifyPassResetCode = asyncHandler(async (req, res, next) => {
-  // 1) Get user based on reset code
   const hashedResetCode = crypto
     .createHash("sha256")
     .update(req.body.resetCode)
@@ -180,13 +177,28 @@ exports.verifyPassResetCode = asyncHandler(async (req, res, next) => {
     passwordResetCode: hashedResetCode,
     passwordResetExpires: { $gt: Date.now() },
   });
+
   if (!user) {
+    // Add debugging to see what's happening
+    const userByCode = await User.findOne({
+      passwordResetCode: hashedResetCode,
+    });
+
+    if (userByCode) {
+      console.log("Code found but expired");
+      console.log("Current time:", Date.now());
+      console.log("Expiry time:", userByCode.passwordResetExpires);
+      console.log(
+        "Time difference (ms):",
+        userByCode.passwordResetExpires - Date.now()
+      );
+    }
+
     return next(new ApiError("Reset code invalid or expired", 400));
   }
 
-  // 2) Reset code valid - set verification status with timestamp
   user.passwordResetVerified = true;
-  user.passwordResetVerifiedAt = Date.now(); // Add verification timestamp
+  user.passwordResetVerifiedAt = Date.now();
   await user.save();
 
   res.status(200).json({
@@ -209,10 +221,16 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   // 2) Check if reset code verified AND still within time limit
   const verificationExpiry = 30 * 60 * 1000; // 30 minutes after verification
 
+  // Convert Date to timestamp if it's a Date object
+  const verifiedAtTimestamp =
+    user.passwordResetVerifiedAt instanceof Date
+      ? user.passwordResetVerifiedAt.getTime()
+      : user.passwordResetVerifiedAt;
+
   if (
     !user.passwordResetVerified ||
     !user.passwordResetVerifiedAt ||
-    Date.now() - user.passwordResetVerifiedAt > verificationExpiry
+    Date.now() - verifiedAtTimestamp > verificationExpiry
   ) {
     // Clear expired verification data
     user.passwordResetVerified = undefined;
@@ -235,8 +253,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   user.passwordResetExpires = undefined;
   user.passwordResetVerified = undefined;
   user.passwordResetVerifiedAt = undefined;
-  user.passwordChangedAt = Date.now(); // Update password changed timestamp
-
+  user.passwordChangedAt = Date.now();
   await user.save();
 
   // 4) If everything is ok, generate token
